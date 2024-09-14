@@ -24,15 +24,16 @@ class SensorModel:
         The original numbers are for reference but HAVE TO be tuned.
         """
         # Original Values
-        # self._z_hit = 1
-        # self._z_short = 0.1
-        # self._z_max = 0.1
-        # self._z_rand = 100
-
-        self._z_hit = 10
+        self._z_hit = 1
         self._z_short = 0.1
         self._z_max = 0.1
         self._z_rand = 100
+
+        # self._z_hit = 8
+        # self._z_short = 0.1
+        # self._z_max = 0.05
+        # self._z_rand = 10
+
 
 
         self._sigma_hit = 50
@@ -54,7 +55,7 @@ class SensorModel:
 
         # Laser Offset(as per ReadME)
         self.laser_offset = 25
-        self.map_resolution = 10
+        self.map_resolution = 10git 
     
     # Function to Tranform from Centre to Laser offset
     def centre2laser_transform(self, x_t1, offset=None, visualize=True):
@@ -146,10 +147,9 @@ class SensorModel:
         # Beam Model
         prob_zt1 = 1.0
         p_hit, p_short, p_max,  p_rand = None, None, None, None
-        scaling_coeff = 1.0
-        for idx, z_t in enumerate(z_t1_arr):
-            
-            # print(f" Z_expected :{z_t1_arr_expected[idx]} | z_real :{z_t}")
+        
+        scaling_coeff = 10.0
+        for idx, z_t in enumerate(z_t1_arr):            
             # Hit Model
             if z_t >= 0 and z_t <= self._max_range:
                 p_hit = np.exp(-( np.square(z_t -z_t1_arr_expected[idx]) / (2*np.square(self._z_hit)) ))
@@ -183,5 +183,7 @@ class SensorModel:
             # Multiply prob for each beam
             prob_zt1 *= (prob_zt_beam)
 
-        prob_zt1 = 1.0
+        # For testing-purposes
+        # exit()
+        # prob_zt1 = 1.0
         return prob_zt1
