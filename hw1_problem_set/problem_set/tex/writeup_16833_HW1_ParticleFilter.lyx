@@ -1,0 +1,1615 @@
+# Legacy file by the initial creator.
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\begin_preamble
+\usepackage{colortbl}
+\usepackage{algorithm,algpseudocode}
+\date{}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 2cm
+\topmargin 2cm
+\rightmargin 2cm
+\bottommargin 2cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation skip
+\defskip bigskip
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+16-833: Robot Localization and Mapping, Spring 2020
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+vspace{10pt}
+\end_layout
+
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\series bold
+Homework 1 - Robot Localization using Particle Filters
+\series default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+large 
+\backslash
+begin{center} This homework may be submitted in groups of 
+\backslash
+textbf{(max) three} people.
+ 
+\backslash
+end{center}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\align right
+
+\series bold
+\bar under
+Due: Monday February 10, 11:59pm, 2020
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+def 
+\backslash
+ans{1} %0: hide, 1: show
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Your homework should be submitted as a
+\series bold
+ typeset PDF file
+\series default
+ along with a
+\series bold
+ 
+\series default
+folder
+\series bold
+ 
+\series default
+including
+\series bold
+ code
+\series default
+ 
+\series bold
+only (no data)
+\series default
+.
+ The PDF must be submitted on 
+\series bold
+Gradescope
+\series default
+, and code submitted on 
+\series bold
+Canvas
+\series default
+.
+ If you have questions, please post them on Piazza or come to office hours.
+ Please do not post solutions or code on Piazza.
+ Discussions are allowed, but each group must write and submit their 
+\series bold
+own, original 
+\series default
+solution.
+ Note that you should list the name and Andrew IDs of each student you have
+ discussed with on the first page of your PDF file.
+ You have a total of 4 late days, use them wisely.
+ As this is a group homework, every late day applies to all members of the
+ group.
+ This is a challenging assignment,
+\series bold
+\emph on
+ so please start early
+\series default
+\emph default
+! Good luck and have fun!
+\end_layout
+
+\begin_layout Standard
+\begin_inset FormulaMacro
+\newcommand{\argmin}{\operatornamewithlimits{arg\, min}}
+{\arg\min}
+\end_inset
+
+
+\begin_inset FormulaMacro
+\newcommand{\argmax}{\operatornamewithlimits{arg\, max}}
+{\arg\max}
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+1.
+ Overview
+\end_layout
+
+\begin_layout Standard
+The goal of this homework is to become familiar with robot localization
+ using particle filters, also known as Monte Carlo Localization.
+ In particular, you will be implementing a global localization filter for
+ a lost indoor mobile robot (global meaning that you do not know the initial
+ pose of the robot).
+ Your lost robot is operating in Wean Hall with nothing but odometry and
+ a laser rangefinder.
+ Fortunately, you have a map of Wean Hall and a deep understanding of particle
+ filtering to help it localize.
+\end_layout
+
+\begin_layout Standard
+As you saw in class, particle filters are non-parametric variants of the
+ recursive Bayes filter with a resampling step.
+ The Prediction Step of the Bayes filter involves sampling particles from
+ a proposal distribution, while the Correction Step computes importance
+ weights for each particle as the ratio of target and proposal distributions.
+ The Resampling Step resamples particles with probabilities proportional
+ to their importance weights.
+\end_layout
+
+\begin_layout Standard
+When applying particle filters for robot localization, each particle represents
+ a robot pose hypothesis which for a 2D localization case includes the 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$(x,y)$
+\end_layout
+
+\end_inset
+
+ position and orientation 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$
+\backslash
+theta$
+\end_layout
+
+\end_inset
+
+ of the robot.
+ The Prediction and Correction Steps are derived from robot motion and sensor
+ models respectively.
+ This can be summarized as an iterative process involving three major steps:
+\end_layout
+
+\begin_layout Enumerate
+Prediction Step: Updating particle poses by sampling particles from the
+ 
+\series bold
+motion model
+\series default
+, that is 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$x^{[m]}_t
+\backslash
+sim p(x_t|u_t,x^{[m]}_{t-1})$
+\end_layout
+
+\end_inset
+
+.
+ The proposal distribution here is the motion model, 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$p(x_t|u_t,x_{t-1})$
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Correction Step: Computing an importance weight 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$w^{[m]}_t$
+\end_layout
+
+\end_inset
+
+ for each particle as the ratio of target and proposal distributions.
+ This reduces to computing weights using the 
+\series bold
+sensor model
+\series default
+, that is 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$w^{[m]}_t = p(z_t|x^{[m]}_{t},
+\backslash
+mathcal{M})$
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Resampling Step: Resampling particles for the next time step with probabilities
+ proportial to their importance weights.
+\end_layout
+
+\begin_layout Standard
+Here, 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$m$
+\end_layout
+
+\end_inset
+
+ is the particle index, 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$t$
+\end_layout
+
+\end_inset
+
+ is the current time step, and 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$
+\backslash
+mathcal{M}$
+\end_layout
+
+\end_inset
+
+ is the occupancy map.
+ 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$x^{[m]}_t, w^{[m]}_t$
+\end_layout
+
+\end_inset
+
+ is the robot pose and importance weight of particle 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$m$
+\end_layout
+
+\end_inset
+
+ at time 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$t$
+\end_layout
+
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+newpage
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+2.
+ Monte Carlo Localization
+\end_layout
+
+\begin_layout Standard
+Monte Carlo Localization (MCL), a popular localization algorithm, is essentially
+ the application of particle filter for mobile robot localization.
+ You can refer to 
+\series bold
+Section 4.3 
+\series default
+of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "thrun2005probabilistic"
+literal "true"
+
+\end_inset
+
+ for details on the MCL algorithm.
+ Algorithm 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ref{algo:mclAlgo}
+\end_layout
+
+\end_inset
+
+, taken from 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "thrun2005probabilistic"
+literal "true"
+
+\end_inset
+
+, describes the particle filter algorithm applied for robot localization.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+begin{algorithm}[!t]
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+caption{Particle Filter for Robot Localization}
+\backslash
+label{algo:mclAlgo}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+begin{algorithmic}[1]
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State $
+\backslash
+bar{
+\backslash
+mathcal{X}}_t$ = ${
+\backslash
+mathcal{X}}_t$ = $
+\backslash
+phi$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+For{$m$ = $1$ to $M$}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State sample $x^{[m]}_t
+\backslash
+sim p(x_t
+\backslash
+ |
+\backslash
+ u_t,x^{[m]}_{t-1})$
+\backslash
+hspace{60pt}{(motion model)}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State $w^{[m]}_t$ = $ p(z_t
+\backslash
+ |
+\backslash
+ x^{[m]}_{t})$
+\backslash
+hspace{107pt}{(sensor model)}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State $
+\backslash
+bar{
+\backslash
+mathcal{X}}_t$ = $
+\backslash
+bar{
+\backslash
+mathcal{X}}_t$ + $
+\backslash
+left<x^{[m]}_t, w^{[m]}_t
+\backslash
+right>$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+EndFor
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+For{$m$ = $1$ to $M$}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State draw $i$ with probability $
+\backslash
+propto$ $w^{[i]}_t$
+\backslash
+hspace{60pt}{(resampling)}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State add $x^{[i]}_t$ to ${
+\backslash
+mathcal{X}}_t$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+EndFor
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State 
+\backslash
+Return ${
+\backslash
+mathcal{X}}_t$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+end{algorithmic}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+end{algorithm}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As you can see, the MCL algorithm requires knowledge of the robot motion
+ and sensor models, and also of the resampling process to be used.
+ We briefly describe these three components and point you to resources with
+ more details and pseudo-codes.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Motion Model
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The motion model 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$p(x_t|u_t,x_{t-1})$
+\end_layout
+
+\end_inset
+
+ is needed as part of the prediction step for updating particle poses from
+ the previous time step using odometry readings.
+ 
+\series bold
+Chapter 5 
+\series default
+of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "thrun2005probabilistic"
+literal "true"
+
+\end_inset
+
+ details two types of motion models, the Odometry Motion Model and the Velocity
+ Motion Model.
+ You can use either model for sampling particles according to 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$x^{[m]}_t
+\backslash
+sim p(x_t|u_t,x^{[m]}_{t-1})$
+\end_layout
+
+\end_inset
+
+.
+ The Odometry Motion Model might be more straightforward to implement since
+ that uses odometry measurements directly as a basis for computing posteriors
+ over the robot poses.
+ 
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Sensor Model
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The sensor model 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$p(z_t|x_t,m)$
+\end_layout
+
+\end_inset
+
+ is needed as part of the correction step for computing importance weights
+ (proportional to observation likelihood) for each particle.
+ Since the robot is equipped with a laser range finder sensor, we'll be
+ using a beam measurement model of range finders.
+ 
+\series bold
+Section 6.3 
+\series default
+of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "thrun2005probabilistic"
+literal "true"
+
+\end_inset
+
+ details this beam measurement model 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$p(z_t|x_t,m)$
+\end_layout
+
+\end_inset
+
+ as a mixture of four probability densities, each modeling a different type
+ of measurement error.
+ You'll have to play around with parameters for these densities based on
+ the sensor data logs that you have.
+ You are also free to go beyond a mixture of these four probability densities
+ and use a measurement model that you think describes the observed laser
+ scans better.
+\end_layout
+
+\begin_layout Standard
+Additionally, as part of this beam measurement model, you'll be performing
+ ray-casting on the occupancy map so as to compute true range readings 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$z^{k*}_t$
+\end_layout
+
+\end_inset
+
+ from individual particle positions (shifted to laser position).
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Resampling
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As part of the resampling process, particles for the next time step are
+ drawn based on their weights in the current time step.
+ A straightforward resampling procedure would be sampling from a multinomial
+ distribution constructed using importance weights of all particles.
+ However, repetitive resampling using such a technique may cause the variance
+ of the particle set (as an estimator of the true belief) to increase.
+\end_layout
+
+\begin_layout Standard
+One strategy for reducing the variance in particle filtering is using a
+ resampling process known as 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+emph{low variance sampling}
+\end_layout
+
+\end_inset
+
+.
+ Another strategy is to reduce the frequency at which resampling takes place.
+ Refer to the Resampling subsection under 
+\series bold
+Section 4.3.4 
+\series default
+of
+\series bold
+ 
+\series default
+
+\begin_inset CommandInset citation
+LatexCommand cite
+key "thrun2005probabilistic"
+literal "true"
+
+\end_inset
+
+
+\series bold
+ 
+\series default
+for more details on variance reduction and using low variance resampling
+ for particle filters.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+3.
+ Implementation
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Resources
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+You may use any programming language for implementation.
+ There is no real-time-ness requirement, although it is advisable to use
+ something faster than MATLAB.
+ Feel free to utilize the techniques that we have discussed in class as
+ well as extensions discussed in [1] or elsewhere.
+ You would be performing global localization for a lost indoor mobile robot
+ in Wean Hall given a map, odometry readings and laser scans.
+ The data directory that you received with this handout (courtesy of Mike
+ Montemerlo) has the following files:
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{instruct.txt}
+\end_layout
+
+\end_inset
+
+ – Format description for the map and the data logs.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{robotdataN.log.gz}
+\end_layout
+
+\end_inset
+
+ – Five data logs (odometry and laser data).
+ 
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{wean.dat.gz}
+\end_layout
+
+\end_inset
+
+ – Map of Wean Hall to use for localization.
+ 
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{wean.gif}
+\end_layout
+
+\end_inset
+
+ – Image of map (just for your information).
+ 
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{bee-map.c}
+\end_layout
+
+\end_inset
+
+ – Example map reader from BeeSoft that you may use if desired.
+ 
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{robotmovie1.gif}
+\end_layout
+
+\end_inset
+
+ – Animation of data log 1 (just for your information).
+ 
+\end_layout
+
+\begin_layout Standard
+We have also provided you with helper code (in Python) that reads in the
+ occupancy map, parses robot sensor logs and implements the outer loop of
+ the particle filter algorithm illustrated in Algorithm 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ref{algo:mclAlgo}
+\end_layout
+
+\end_inset
+
+.
+ The motion model, sensor model, and resampling implementations are left
+ as an exercise for you.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{main.py}
+\end_layout
+
+\end_inset
+
+ – Parses sensor logs (
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{robotdata1.log}
+\end_layout
+
+\end_inset
+
+) and implements outer loop of the particle filter algorithm shown in Algorithm
+ 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ref{algo:mclAlgo}
+\end_layout
+
+\end_inset
+
+.
+ Relies on SensorModel, MotionModel and Resampling classes for returning
+ appropriate values.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{MapReader.py}
+\end_layout
+
+\end_inset
+
+ – Reads in the Wean Hall map (
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{wean.dat}
+\end_layout
+
+\end_inset
+
+) and computes and displays corresponding occupancy grid map.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{MotionModel.py, SensorModel.py, Resampling.py}
+\end_layout
+
+\end_inset
+
+ - Provides class interfaces for expected input/output arguments.
+ Implementation of corresponding algorithms are left as an exercise for
+ you.
+\end_layout
+
+\begin_layout Standard
+You are free to use the helper code directly or purely for reference purposes.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Improving Efficiency
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Although there is no real-time-ness requirement, the faster your code, the
+ more particles you will be able to use feasibly and faster would be your
+ parameter tuning iterations.
+ You'll most probably have to apply some implementation 'hacks' to improve
+ performance, for instance,
+\end_layout
+
+\begin_layout Itemize
+Intializing particles in completely unoccupied areas instead of uniformly
+ everywhere on the map.
+\end_layout
+
+\begin_layout Itemize
+Subsampling the laser scans to say, every 5 degrees, instead of considering
+ all 180 range measurements
+\end_layout
+
+\begin_layout Itemize
+When computing importance weights based on the sensor model, be cognizant
+ of numerical stability issues that may arise when multiplying together
+ likelihood probabilities of all range measurements within a scan.
+ You might want to numerically scale the weights or replace the multiplication
+ of likelihood probabilities with a summation of log likelihoods.
+\end_layout
+
+\begin_layout Itemize
+Since motion model and sensor model computations are independent for all
+ particles, parallelizing your code would make it much faster.
+\end_layout
+
+\begin_layout Itemize
+You'll observe that operations like ray-casting are one of the most computationa
+lly expensive operations.
+ Think of approaches to make this faster, for instance using coarser discrete
+ sampling along the ray or possibly even precomputing a look-up table for
+ the raycasts.
+\end_layout
+
+\begin_layout Itemize
+Lastly, if you're comfortable with C++, implementing your particle filter
+ in that would be much faster!
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Debugging
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For easier debugging, ensure that you visualize and test individual modules
+ like the motion model, sensor model or the resampling separately.
+ Some ideas for doing that are,
+\end_layout
+
+\begin_layout Itemize
+Test your motion model separately by using a single particle and plotting
+ its trajectory on the occupancy map.
+ The odometry would cause the particle position to drift over time globally,
+ but locally the motion should still make sense when comparing with given
+ animation of datalog 1 (
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{robotmovie1.gif}
+\end_layout
+
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Itemize
+Cross-check your sensor model mixture probability distribution by plotting
+ the 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$p(z_t|z^*_t)$
+\end_layout
+
+\end_inset
+
+ graph for some set of values of 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+$z^*_t$
+\end_layout
+
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Itemize
+Test your ray-casting algorithm outputs by drawing robot position, laser
+ scan ranges and the ray casting outputs on the occupancy map for multiple
+ time steps.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+4.
+ What to turn in
+\end_layout
+
+\begin_layout Standard
+You should generate a visualization (video) of your robot localizing on
+ 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttt{robotdata1.log}
+\end_layout
+
+\end_inset
+
+ and another log of your choice.
+ Don't worry—you're implementation may not work 
+\series bold
+all 
+\series default
+the time—but should perform most of the time for a reasonable number of
+ particles.
+ Hyperlinks to the videos must be in the report—we prefer unlisted Youtube
+ videos or Google Drive links.
+ Please ensure proper viewing permissions are enabled before sharing the
+ links.
+ Please speed-up videos to ensure each log is under 2 minutes, and mention
+ the speed multiplier in the video or report.
+ 
+\series bold
+The report must describe your approach, implementation, description of performan
+ce, robustness, repeatability, and results.
+
+\series default
+ Make sure you describe your motion and sensor models, your resampling procedure
+, as well as the parameters you had to tune (and their values).
+ Include some future work/improvement ideas in your report as well.
+ Turn in your report
+\series bold
+ 
+\series default
+and code on 
+\series bold
+Gradescope
+\series default
+ by the due date.
+ Do not upload the 
+\begin_inset Formula $\mathtt{data/}$
+\end_inset
+
+ folder or any other data.
+ Only one group member needs to submit.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+small Score breakup
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+(10 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Motion Model: implementation correctness, description
+\end_layout
+
+\begin_layout Standard
+(20 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Sensor Model: implementation correctness, description
+\end_layout
+
+\begin_layout Standard
+(10 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Resampling Process: implementation correctness, description
+\end_layout
+
+\begin_layout Standard
+(10 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Discussion of parameter tuning
+\end_layout
+
+\begin_layout Standard
+(30 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Performance
+\end_layout
+
+\begin_layout Standard
+(20 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\backslash
+ 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Write-up quality, video quality, readability, description of performance,
+ and future work
+\end_layout
+
+\begin_layout Standard
+(Optional Extra Credit: 10 + 10 points) 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ Kidnapped robot problem and Adaptive number of particles
+\end_layout
+
+\begin_layout Standard
+\begin_inset Note Comment
+status open
+
+\begin_layout Plain Layout
+10) motion model: implementation correctness, description 20) sensor model:
+ implementation correctness, description 10) resampling model: implementation
+ correctness, description 10) discussion of parameter tuning 30) overall
+ correctness (how well do combining the four work) 5) videos (we will have
+ difficulty measuring correctness without videos) 15) write-up quality,
+ readability, and discussion of future work EC 5 - 15 depending on quality)
+ kidnapped robot EC 5 - 10 depending on quality, impact) adaptive particle
+ numbers
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+vspace{10pt}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+5.
+ Extra credit
+\end_layout
+
+\begin_layout Standard
+Focus on getting your particle filter to work well before attacking the
+ extra credit.
+ Points will be given for an implementation of the kidnapped robot problem
+ and adaptive number of particles.
+ Please answer the corresponding questions below in your write up.
+\end_layout
+
+\begin_layout Standard
+i.
+ 
+\series bold
+Kidnapped robot problem:
+\series default
+ The kidnapped robot problem commonly refers to a situation where an autonomous
+ robot in operation is carried to an arbitrary location.
+ You can simulate such a situation by either fusing two of the log files
+ or removing a chunk of readings from one log.
+ How would your localization algorithm deal with the uncertainity created
+ in a kidnapped robot problem scenario?
+\end_layout
+
+\begin_layout Standard
+ii.
+ 
+\series bold
+Adaptive number of particles:
+\series default
+ Can you think of a method that is more efficient to run, based on reducing
+ the number of particles over timesteps? Describe the metric you use for
+ choosing the number of particles at any time step.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+6.
+ Advice
+\end_layout
+
+\begin_layout Standard
+The performance of your algorithm is dependent on (i) parameter tuning and
+ (ii) number of particles.
+ While increasing the number of particles gives you better performance,
+ it also leads to increased computational time.
+ An ideal implementation has a reasonable number of particles, while also
+ not being terribly slow.
+ Consider these factors while deciding your language of choice—e.g.
+ choosing between a faster implementation in C++ vs.
+ using the Python skeleton code.
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset bibtex
+LatexCommand bibtex
+bibfiles "references_particlefilter"
+options "plain"
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
