@@ -120,8 +120,8 @@ if __name__ == '__main__':
         time_stamp = meas_vals[-1]
 
         # ignore pure odometry measurements for (faster debugging)
-        # if ((time_stamp <= 0.0) | (meas_type == "O")):
-        #     continue
+        if ((time_stamp <= 0.0) | (meas_type == "O")):
+            continue
 
         if (meas_type == "L"):
             # [x, y, theta] coordinates of laser in odometry frame
@@ -148,7 +148,7 @@ if __name__ == '__main__':
             """
             x_t0 = X_bar[m, 0:3]
             x_t1 = motion_model.update(u_t0, u_t1, x_t0)
-
+        
             """
             SENSOR MODEL
             """
@@ -169,3 +169,5 @@ if __name__ == '__main__':
 
         if args.visualize:
             visualize_timestep(X_bar, time_idx, args.output)
+        
+        # exit()

@@ -36,5 +36,9 @@ class Resampling:
         """
         TODO : Add your code here
         """
-        X_bar_resampled =  np.zeros_like(X_bar)
+        # X_bar_resampled =  np.zeros_like(X_bar)
+        
+        # For Testing Purposes
+        X_bar_resampled = X_bar 
+        
         return X_bar_resampled
