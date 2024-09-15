@@ -24,15 +24,15 @@ class SensorModel:
         The original numbers are for reference but HAVE TO be tuned.
         """
         # Original Values
-        self._z_hit = 1
+        # self._z_hit = 1
+        # self._z_short = 0.1
+        # self._z_max = 0.1
+        # self._z_rand = 100
+
+        self._z_hit = 15
         self._z_short = 0.1
         self._z_max = 0.1
-        self._z_rand = 100
-
-        # self._z_hit = 8
-        # self._z_short = 0.1
-        # self._z_max = 0.05
-        # self._z_rand = 10
+        self._z_rand = 5
 
 
 
@@ -50,12 +50,14 @@ class SensorModel:
 
         # ADDED By ME
 
-        # Occupancy Map
+        # Map meta-data
         self.occupancy_map  = occupancy_map
+        self.map_width, self.map_height = occupancy_map.shape
+        self.map_resolution = 10
 
-        # Laser Offset(as per ReadME)
+        # Laser offset(as per ReadME)
         self.laser_offset = 25
-        self.map_resolution = 10git 
+        
     
     # Function to Tranform from Centre to Laser offset
     def centre2laser_transform(self, x_t1, offset=None, visualize=True):
@@ -95,30 +97,33 @@ class SensorModel:
     # Function to perform ray-tracing
     def ray_tracing(self, x_t1):
         z_t1_arr_expected = np.zeros((180), dtype=np.float64)
-
+        
+        # Trace ray for each angle
         for beam_ang in range(1,180+1):
-            
-            # Trace ray for each single angle
-            for step_ in range(0, int(self._max_range/10) + 1):
-                ray_len = step_*self.map_resolution
-                ray_x = x_t1[0] + ray_len*np.cos(x_t1[2] + beam_ang/np.pi)
-                ray_y = x_t1[1] + ray_len*np.sin(x_t1[2] + beam_ang/np.pi)
-                
-                # If out-of-bound then give max range
-                if ray_x > 8000 or ray_y > 8000:
+            beam_ang_rad = (beam_ang/180.0)*np.pi
+            # Trace ray for till max-range 
+            for ray_len in range(0, self._max_range+ self.map_resolution, self.map_resolution):
+                ray_x = x_t1[0] + ray_len*np.cos(x_t1[2] + beam_ang_rad)
+                ray_y = x_t1[1] + ray_len*np.sin(x_t1[2] + beam_ang_rad) 
+
+                map_x = int(ray_x/self.map_resolution)
+                map_y = int(ray_y/self.map_resolution)
+
+                # Give max-ranges for out-of-bound rays
+                if map_x < 0 or map_x >= self.map_width or map_y < 0 or map_y >= self.map_height:
                     z_t1_arr_expected[beam_ang-1] = self._max_range
-                    # print(f"[WARN] Ray out of bound for beam_x:{ray_x}, beam_y:{ray_y}")
                     break
                 
-                # If prob > obstacle threshold
-                elif self.occupancy_map[int(ray_x/10), int(ray_y/10)] > self._min_probability:
-                     z_t1_arr_expected[beam_ang-1] = ray_len
-                     break
+                # Probability > Obstacle prob
+                if self.occupancy_map[map_x, map_y] > self._min_probability:
+                    z_t1_arr_expected[beam_ang-1] = ray_len
+                    break
                 
-                # If no obstacle, give max range
-                if ray_len == self._max_range:
+                # If near to max-range
+                if np.isclose(ray_len, self._max_range):
                     z_t1_arr_expected[beam_ang-1] = self._max_range
-            
+                    break
+
         return z_t1_arr_expected
                     
                 
@@ -133,11 +138,6 @@ class SensorModel:
         TODO : Add your code here
         """
 
-        # Steps:
-        # 1. Tranform robot belief to laser location
-        # 2. Perform Ray-Casting to get z_expected  for each ray
-        # 3. Use it to calculate the four probabilites in Beam Model. 
-
         # Centre to Laser Offset Transform
         x_t1_offset = self.centre2laser_transform(x_t1, visualize=False)
         
@@ -146,33 +146,27 @@ class SensorModel:
         
         # Beam Model
         prob_zt1 = 1.0
-        p_hit, p_short, p_max,  p_rand = None, None, None, None
+        p_hit, p_short, p_max, p_rand = 0.0, 0.0, 0.0, 0.0
         
         scaling_coeff = 10.0
         for idx, z_t in enumerate(z_t1_arr):            
             # Hit Model
             if z_t >= 0 and z_t <= self._max_range:
                 p_hit = np.exp(-( np.square(z_t -z_t1_arr_expected[idx]) / (2*np.square(self._z_hit)) ))
-            else:
-                p_hit = 0
+            
             
             # Short Model
             if z_t >= 0 and z_t <= self._max_range:
                 p_short = self._lambda_short*np.exp(-self._lambda_short*z_t)
-            else:
-                p_short = 0
+            
             
             # Max Range Model
             if z_t == self._max_range:
                 p_max = 1
-            else:
-                p_max = 0
             
             # Random Measurement Model
             if z_t >= 0 and z_t < self._max_range:
                 p_rand = 1/self._max_range
-            else:
-                p_rand = 0
             
             
             # Full model probability 
