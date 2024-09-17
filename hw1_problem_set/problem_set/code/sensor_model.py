@@ -29,14 +29,20 @@ class SensorModel:
         # self._z_max = 0.1
         # self._z_rand = 100
 
-        self._z_hit = 15
-        self._z_short = 0.1
-        self._z_max = 0.1
-        self._z_rand = 5
+        # self._z_hit = 50
+        # self._z_short = 0.1
+        # self._z_max = 0.1
+        # self._z_rand = 5
 
+        
+        self._z_hit = 0.05
+        self._z_short = 0.5 
+        self._z_max = 0.05
+        self._z_rand = 0.01
 
-
-        self._sigma_hit = 50
+        # Keeping it small by assuming its good lidar.
+        self._sigma_hit = 0.5
+        # self._sigma_hit = 50
         self._lambda_short = 0.1
 
         # Used in p_max and p_rand, optionally in ray casting
@@ -94,6 +100,8 @@ class SensorModel:
             
         return x_t1_l 
 
+
+    
     # Function to perform ray-tracing
     def ray_tracing(self, x_t1):
         z_t1_arr_expected = np.zeros((180), dtype=np.float64)
@@ -118,7 +126,7 @@ class SensorModel:
                 if self.occupancy_map[map_x, map_y] > self._min_probability:
                     z_t1_arr_expected[beam_ang-1] = ray_len
                     break
-                
+                         
                 # If near to max-range
                 if np.isclose(ray_len, self._max_range):
                     z_t1_arr_expected[beam_ang-1] = self._max_range
@@ -148,31 +156,37 @@ class SensorModel:
         prob_zt1 = 1.0
         p_hit, p_short, p_max, p_rand = 0.0, 0.0, 0.0, 0.0
         
-        scaling_coeff = 10.0
+        scaling_coeff = 1.0
         for idx, z_t in enumerate(z_t1_arr):            
             # Hit Model
-            if z_t >= 0 and z_t <= self._max_range:
-                p_hit = np.exp(-( np.square(z_t -z_t1_arr_expected[idx]) / (2*np.square(self._z_hit)) ))
+            if 0 <= z_t <= self._max_range:
+                p_hit = np.exp(-( np.square(z_t -z_t1_arr_expected[idx]) / (2*np.square(self._sigma_hit)) ))
             
             
             # Short Model
-            if z_t >= 0 and z_t <= self._max_range:
+            if 0 <= z_t <= z_t1_arr_expected[idx]:
                 p_short = self._lambda_short*np.exp(-self._lambda_short*z_t)
             
             
-            # Max Range Model
-            if z_t == self._max_range:
+            # Max Range Model (giving some tolerance here)
+            if np.isclose(z_t,self._max_range, rtol=2):
                 p_max = 1
             
             # Random Measurement Model
-            if z_t >= 0 and z_t < self._max_range:
+            if 0 <= z_t < self._max_range:
                 p_rand = 1/self._max_range
             
             
             # Full model probability 
-            prob_zt_beam = (self._z_hit*p_hit + self._z_short*p_short + \
-                           self._z_max*p_max + self._z_rand*p_rand)*scaling_coeff
+            prob_zt_beam = (self._z_hit*p_hit + 
+                            self._z_short*p_short +
+                            self._z_max*p_max + 
+                            self._z_rand*p_rand) * scaling_coeff
             
+            
+            # Preventing particle collapse
+            prob_zt_beam = max(prob_zt_beam, 1e-9)  
+
             
             # Multiply prob for each beam
             prob_zt1 *= (prob_zt_beam)
