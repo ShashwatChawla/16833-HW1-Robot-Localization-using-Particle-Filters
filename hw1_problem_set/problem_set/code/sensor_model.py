@@ -101,7 +101,6 @@ class SensorModel:
         return x_t1_l 
 
 
-    
     # Function to perform ray-tracing
     def ray_tracing(self, x_t1):
         z_t1_arr_expected = np.zeros((180), dtype=np.float64)
@@ -152,46 +151,40 @@ class SensorModel:
         # Ray-Tracing
         z_t1_arr_expected = self.ray_tracing(x_t1_offset)
         
-        # Beam Model
-        prob_zt1 = 1.0
-        p_hit, p_short, p_max, p_rand = 0.0, 0.0, 0.0, 0.0
         
         scaling_coeff = 1.0
-        for idx, z_t in enumerate(z_t1_arr):            
-            # Hit Model
-            if 0 <= z_t <= self._max_range:
-                p_hit = np.exp(-( np.square(z_t -z_t1_arr_expected[idx]) / (2*np.square(self._sigma_hit)) ))
-            
-            
-            # Short Model
-            if 0 <= z_t <= z_t1_arr_expected[idx]:
-                p_short = self._lambda_short*np.exp(-self._lambda_short*z_t)
-            
-            
-            # Max Range Model (giving some tolerance here)
-            if np.isclose(z_t,self._max_range, rtol=2):
-                p_max = 1
-            
-            # Random Measurement Model
-            if 0 <= z_t < self._max_range:
-                p_rand = 1/self._max_range
-            
-            
-            # Full model probability 
-            prob_zt_beam = (self._z_hit*p_hit + 
-                            self._z_short*p_short +
-                            self._z_max*p_max + 
-                            self._z_rand*p_rand) * scaling_coeff
-            
-            
-            # Preventing particle collapse
-            prob_zt_beam = max(prob_zt_beam, 1e-9)  
+        
+        p_hit_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_short_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_rand_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_max_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        prob_zt1 = 1.0
+        
+        ##### Vectorized Beam Model
+        # p_hit condition
+        valid_hit_idxs = (z_t1_arr >= 0) & (z_t1_arr <= self._max_range) 
+        p_hit_beams[valid_hit_idxs] = np.exp(-( np.square(z_t1_arr[valid_hit_idxs] -z_t1_arr_expected[valid_hit_idxs]) / (2*np.square(self._sigma_hit)) ))
+        
+        # p_short condition
+        valid_short_idxs = (z_t1_arr >= 0) & (z_t1_arr <= z_t1_arr_expected)
+        p_short_beams[valid_short_idxs] = self._lambda_short*np.exp(-self._lambda_short*z_t1_arr[valid_short_idxs])
 
-            
-            # Multiply prob for each beam
-            prob_zt1 *= (prob_zt_beam)
+        # p_rand condition 
+        valid_rand_idxs = (z_t1_arr >= 0) & (z_t1_arr < self._max_range)
+        p_rand_beams[valid_rand_idxs] = 1/self._max_range
+
+        # p_max condition (code fcks up w/tout tolerance)
+        valid_max_idxs = np.isclose(z_t1_arr, z_t1_arr_expected, rtol=1)
+        p_max_beams[valid_max_idxs] = 1
+
+        # Full-model probability 
+        p_beams = self._z_hit*p_hit_beams + self._z_short*p_short_beams + self._z_rand*p_rand_beams + self._z_max*p_max_beams
+        
+        # Added for Numerical Stability
+        p_beams[p_beams < 1e-9] = 1e-9  
+
+        prob_zt1 = np.prod(p_beams)
 
         # For testing-purposes
-        # exit()
         # prob_zt1 = 1.0
         return prob_zt1
