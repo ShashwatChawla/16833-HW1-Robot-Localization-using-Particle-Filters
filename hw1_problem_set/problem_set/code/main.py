@@ -34,6 +34,26 @@ def visualize_timestep(X_bar, tstep, output_path):
     plt.pause(0.00001)
     scat.remove()
 
+# Function to visualize a single ray (TODO: For all the particles)
+def visualize_rays(x_t, z_t):
+    x_locs = x_t[0] / 10.0
+    y_locs = x_t[1] / 10.0
+    scat = plt.scatter(x_locs, y_locs, c='r', marker='o')
+    angles = np.radians(np.arange(-90, 90, 1))
+    ray_end_x = x_locs + (z_t*np.cos(x_t[2] + angles)/10)
+    ray_end_y = y_locs + (z_t*np.sin(x_t[2] + angles)/10)
+    
+    lines = []
+
+    for x, y in zip(ray_end_x, ray_end_y):
+        line = plt.plot([x_locs, x], [y_locs, y], 'g-') 
+        lines.extend(line) 
+    plt.pause(1)
+
+    for line in lines:
+        line.remove()
+    scat.remove()
+
 
 def init_particles_random(num_particles, occupancy_map):
 
@@ -60,6 +80,27 @@ def init_particles_freespace(num_particles, occupancy_map):
     """
     X_bar_init = np.zeros((num_particles, 4))
 
+    freespace_rows, freespace_cols = np.where(occupancy_map == 0)
+    # Rows are y-axis
+    valid_pts = list(zip(freespace_cols, freespace_rows))
+    
+    if len(valid_pts) >= num_particles:
+        rand_pts = np.random.choice(len(valid_pts), num_particles, replace=False)
+        selected_pts = np.array([valid_pts[i] for i in rand_pts])
+    else:
+        print(f"[ERROR] Not enough points to sample from free-space")
+        exit()
+    
+    # Values are in map-frame
+    selected_pts *= 10
+    # Randomly sample theta-values
+    theta0_vals = np.random.uniform(-3.14, 3.14, (num_particles, 1))
+    # initialize weights for all particles
+    w0_vals = np.ones((num_particles, 1), dtype=np.float64)
+    w0_vals = w0_vals / num_particles
+
+    X_bar_init = np.hstack((selected_pts, theta0_vals, w0_vals))
+
     return X_bar_init
 
 
@@ -78,10 +119,13 @@ if __name__ == '__main__':
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--path_to_map', default='../data/map/wean.dat')
-    parser.add_argument('--path_to_log', default='../data/log/robotdata1.log')
+    parser.add_argument('--path_to_log', default='../data/log/robotdata3.log')
     parser.add_argument('--output', default='results')
     parser.add_argument('--num_particles', default=500, type=int)
     parser.add_argument('--visualize', action='store_true')
+    # Added to visualize ray-tracing
+    parser.add_argument('--visualize_rays', action='store_true')
+    
     args = parser.parse_args()
 
     src_path_map = args.path_to_map
@@ -97,8 +141,9 @@ if __name__ == '__main__':
     resampler = Resampling()
 
     num_particles = args.num_particles
-    X_bar = init_particles_random(num_particles, occupancy_map)
-    # X_bar = init_particles_freespace(num_particles, occupancy_map)
+    # X_bar = init_particles_random(num_particles, occupancy_map)
+    X_bar = init_particles_freespace(num_particles, occupancy_map)
+    # exit()
     """
     Monte Carlo Localization Algorithm : Main Loop
     """
@@ -159,6 +204,11 @@ if __name__ == '__main__':
             else:
                 X_bar_new[m, :] = np.hstack((x_t1, X_bar[m, 3]))
 
+            # if args.visualize_rays:
+            #     z_t = sensor_model.ray_tracing(x_t1)
+            #     visualize_rays(x_t1, z_t)
+
+
         X_bar = X_bar_new
         u_t0 = u_t1
 
@@ -169,5 +219,7 @@ if __name__ == '__main__':
 
         if args.visualize:
             visualize_timestep(X_bar, time_idx, args.output)
+
         
         # exit()
+        
