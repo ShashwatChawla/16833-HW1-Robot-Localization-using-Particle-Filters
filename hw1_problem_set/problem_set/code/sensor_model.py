@@ -33,7 +33,6 @@ class SensorModel:
         # self._z_short = 0.1
         # self._z_max = 0.1
         # self._z_rand = 5
-
         
         self._z_hit = 0.05
         self._z_short = 0.5 
@@ -101,38 +100,41 @@ class SensorModel:
         return x_t1_l 
 
 
+
     # Function to perform ray-tracing
     def ray_tracing(self, x_t1):
         z_t1_arr_expected = np.zeros((180), dtype=np.float64)
         
         # Trace ray for each angle
-        for beam_ang in range(1,180+1):
+        for idx, beam_ang in enumerate(np.arange(-90, 90, 1)):
+            
             beam_ang_rad = (beam_ang/180.0)*np.pi
-            # Trace ray for till max-range 
+            
+            # Trace ray for till max-range
             for ray_len in range(0, self._max_range+ self.map_resolution, self.map_resolution):
                 ray_x = x_t1[0] + ray_len*np.cos(x_t1[2] + beam_ang_rad)
                 ray_y = x_t1[1] + ray_len*np.sin(x_t1[2] + beam_ang_rad) 
 
                 map_x = int(ray_x/self.map_resolution)
                 map_y = int(ray_y/self.map_resolution)
-
+                
                 # Give max-ranges for out-of-bound rays
                 if map_x < 0 or map_x >= self.map_width or map_y < 0 or map_y >= self.map_height:
-                    z_t1_arr_expected[beam_ang-1] = self._max_range
+                    z_t1_arr_expected[idx] = self._max_range
                     break
-                
+
                 # Probability > Obstacle prob
-                if self.occupancy_map[map_x, map_y] > self._min_probability:
-                    z_t1_arr_expected[beam_ang-1] = ray_len
+                elif self.occupancy_map[map_y, map_x] > self._min_probability:
+                    z_t1_arr_expected[idx] = ray_len
                     break
                          
                 # If near to max-range
-                if np.isclose(ray_len, self._max_range):
-                    z_t1_arr_expected[beam_ang-1] = self._max_range
+                elif np.isclose(ray_len, self._max_range):
+                    z_t1_arr_expected[idx] = self._max_range
                     break
 
         return z_t1_arr_expected
-                    
+                
                 
 
     def beam_range_finder_model(self, z_t1_arr, x_t1):
@@ -145,19 +147,22 @@ class SensorModel:
         TODO : Add your code here
         """
 
+        # print(f"Sample pose :{x_t1}")
+        
         # Centre to Laser Offset Transform
         x_t1_offset = self.centre2laser_transform(x_t1, visualize=False)
         
+        # print(f"Sample tfed pose :{x_t1_offset}")
         # Ray-Tracing
         z_t1_arr_expected = self.ray_tracing(x_t1_offset)
         
         
         scaling_coeff = 1.0
         
-        p_hit_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_hit_beams   = np.zeros(z_t1_arr.shape, dtype=np.float64)
         p_short_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
-        p_rand_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
-        p_max_beams = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_rand_beams  = np.zeros(z_t1_arr.shape, dtype=np.float64)
+        p_max_beams   = np.zeros(z_t1_arr.shape, dtype=np.float64)
         prob_zt1 = 1.0
         
         ##### Vectorized Beam Model
