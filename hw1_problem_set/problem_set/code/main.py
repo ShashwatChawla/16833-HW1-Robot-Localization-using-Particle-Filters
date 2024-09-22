@@ -34,6 +34,31 @@ def visualize_timestep(X_bar, tstep, output_path):
     plt.pause(0.00001)
     scat.remove()
 
+def visualize_tracing():
+    x, y = (402, 484)
+    angle_values = sensor_model.ray_trace_measurements(x, y)
+    
+    angles = np.radians(np.arange(-180, 180, 1))
+    ray_end_x = x + (angle_values*np.cos(angles)/10)
+    ray_end_y = y + (angle_values*np.sin(angles)/10)
+    
+    lines = []
+
+    for x_, y_ in zip(ray_end_x, ray_end_y):
+        line = plt.plot([x, x_], [y, y_], 'y-') 
+        lines.extend(line) 
+    
+    scat = plt.scatter(x, y, c='r', marker='o')
+
+    plt.pause(0)
+
+    for line in lines:
+        line.remove()
+    scat.remove()
+
+    # exit()
+
+
 # Function to visualize a single ray (TODO: For all the particles)
 def visualize_rays(x_t, z_t):
     x_locs = x_t[0] / 10.0
@@ -119,7 +144,7 @@ if __name__ == '__main__':
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--path_to_map', default='../data/map/wean.dat')
-    parser.add_argument('--path_to_log', default='../data/log/robotdata3.log')
+    parser.add_argument('--path_to_log', default='../data/log/robotdata1.log')
     parser.add_argument('--output', default='results')
     parser.add_argument('--num_particles', default=500, type=int)
     parser.add_argument('--visualize', action='store_true')
@@ -143,7 +168,9 @@ if __name__ == '__main__':
     num_particles = args.num_particles
     # X_bar = init_particles_random(num_particles, occupancy_map)
     X_bar = init_particles_freespace(num_particles, occupancy_map)
-    # exit()
+    
+    # sensor_model.trace_map()
+    
     """
     Monte Carlo Localization Algorithm : Main Loop
     """
@@ -184,6 +211,8 @@ if __name__ == '__main__':
 
         X_bar_new = np.zeros((num_particles, 4), dtype=np.float64)
         u_t1 = odometry_robot
+
+        
 
         # Note: this formulation is intuitive but not vectorized; looping in python is SLOW.
         # Vectorized version will receive a bonus. i.e., the functions take all particles as the input and process them in a vector.
