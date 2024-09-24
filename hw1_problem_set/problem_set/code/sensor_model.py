@@ -24,25 +24,26 @@ class SensorModel:
         The original numbers are for reference but HAVE TO be tuned.
         """
         # Original Values
-        # self._z_hit = 1
+        # self._z_hit = 10
         # self._z_short = 0.1
         # self._z_max = 0.1
         # self._z_rand = 100
 
-        # self._z_hit = 50
-        # self._z_short = 0.1
-        # self._z_max = 0.1
-        # self._z_rand = 5
+        self._z_hit = 50
+        self._z_short = 40
+        self._z_max = 10
+        self._z_rand = 50
         
-        self._z_hit = 0.05
-        self._z_short = 0.5 
-        self._z_max = 0.05
-        self._z_rand = 0.01
+        # self._z_hit = 0.05
+        # self._z_short = 0.5 
+        # self._z_max = 0.05
+        # self._z_rand = 0.01
 
         # Keeping it small by assuming its good lidar.
-        self._sigma_hit = 0.5
+        self._sigma_hit = 15.0
+        # self._sigma_hit = 5.0
         # self._sigma_hit = 50
-        self._lambda_short = 0.1
+        self._lambda_short = 0.01
 
         # Used in p_max and p_rand, optionally in ray casting
         self._max_range = 1000
@@ -67,24 +68,6 @@ class SensorModel:
             self.particle_rays = pickle.load(f)
         
         print("Sensor map loaded successfully.")
-
-
-        # # Create a new dictionary with updated x, y values
-        # modified_sensor_map = {}
-
-        # for (x, y), ang_vals in self.particle_rays.items():
-        #     # Divide x and y by 10
-        #     new_x = x / 10
-        #     new_y = y / 10
-        #     # Store the modified key-value pair in the new dictionary
-        #     modified_sensor_map[(new_x, new_y)] = ang_vals
-
-        # # Save the modified sensor_map back to the pickle file
-        # with open('particle_rays.pkl', 'wb') as f:
-        #     pickle.dump(modified_sensor_map, f)
-
-        # print("Sensor map updated and saved successfully.")
-        # exit()
 
     
     # Function to Tranform from Centre to Laser offset
@@ -221,85 +204,52 @@ class SensorModel:
         TODO : Add your code here
         """
 
-        # Ray-Tracing
-        # z_t1_arr_expected = self.ray_tracing(x_t1_offset)
-        # z_t1_arr_expected = self.ray_tracing(x_t1_offset)
-
         z_t1_arr_expected = np.zeros((180), dtype=np.float64)
+        
         # Centre to Laser Offset Transform
-        x_t1_offset = self.centre2laser_transform(x_t1, visualize=False)
+        x_t1_transformed = self.centre2laser_transform(x_t1, visualize=False)
 
-        map_x, map_y = int(x_t1_offset[0]/self.map_resolution), int(x_t1_offset[1]/self.map_resolution)
+        # Searhch Hash-map for Ray-Tracing
+        map_x, map_y = int(x_t1_transformed[0]/self.map_resolution), int(x_t1_transformed[1]/self.map_resolution)
         if (map_x, map_y) in self.particle_rays:
-            angles_values = self.particle_rays[(map_x, map_y)]
-            # print(f"------ Ray found for map pose:({map_x}, {map_y}).")
+            exprected_ray_vals = self.particle_rays[(map_x, map_y)]
         else:
             # Probability zero since the particle is out of free-space(probably lol)
-            # print(f"####### Map pose out-side free-space:({map_x}, {map_y}).")
             return 0
-            return z_t1_arr_expected
-        
+            
         ang_arr = np.arange(-3.14, 3.14, np.pi/180)
 
-        theta_ = x_t1_offset[2] 
-        # Consider just two decimals
+        theta_ = x_t1_transformed[2] 
+
+        # Consider just till two decimals
         laser_min = round(theta_ - 1.57, 2)
         laser_max = round(theta_ + 1.57, 2)
         
-        # Handle wrapping of laser_min and laser_max
+        # Wrap laser_min and laser_max if out-of bounds
         if laser_min < -3.14:
-            laser_min += 2 * np.pi  # Wrap around by adding 2π
+            laser_min += 2 * np.pi  
         if laser_max > 3.14:
-            laser_max -= 2 * np.pi  # Wrap around by subtracting 2π
+            laser_max -= 2 * np.pi  
 
+        # Basic Condition 
         if laser_min <= laser_max:
-            # print("if condition")
-            # Standard case: extract range between laser_min and laser_max
             closest_min_idx = np.argmin(np.abs(ang_arr - laser_min))
             closest_max_idx = closest_min_idx + 180
-            # print(f"min_idx :{closest_min_idx} | max_idx :{closest_max_idx}")
-            # Make sure to handle array wrap-around when slicing
-            z_t1_arr_expected = np.array(angles_values[closest_min_idx:closest_max_idx])
+            z_t1_arr_expected = np.array(exprected_ray_vals[closest_min_idx:closest_max_idx])
         else:
-            # print("else condition")
-            # Wrapped case: extract range from laser_min to 3.14 and from -3.14 to laser_max
             closest_min_idx = np.argmin(np.abs(ang_arr - laser_min))
             closest_max_idx = np.argmin(np.abs(ang_arr - laser_max))
 
             # Combine values from two segments
-            first_segment = angles_values[closest_min_idx:]
-            second_segment = angles_values[:closest_max_idx]
+            first_segment = exprected_ray_vals[closest_min_idx:]
+            second_segment = exprected_ray_vals[:closest_max_idx]
 
+            # This should not be required. Debug
             diff = 180 - len(first_segment) + len(second_segment) 
             if diff > 0:
-                second_segment = angles_values[:closest_max_idx + diff]
+                second_segment = exprected_ray_vals[:closest_max_idx + diff]
             # Adjust to ensure the total length is exactly 180 readings
             z_t1_arr_expected = np.concatenate((first_segment, second_segment))[:180]
-
-
-
-        # # Handle the case where laser_min becomes larger than laser_max after wrapping
-        # if laser_min <= laser_max:
-        #     print("if condition")
-        #     # Standard case: extract range between laser_min and laser_max
-        #     closest_min_idx = np.argmin(np.abs(ang_arr - laser_min))
-        #     closest_max_idx = np.argmin(np.abs(ang_arr - laser_max))
-        #     z_t1_arr_expected = np.array(angles_values[closest_min_idx:closest_max_idx])
-        # else:
-        #     print("else condition")
-        #     # Wrapped case: extract range from laser_min to 3.14 and from -3.14 to laser_max
-        #     closest_min_idx = np.argmin(np.abs(ang_arr - laser_min))
-        #     closest_max_idx = np.argmin(np.abs(ang_arr - laser_max))
-
-        #     # Combine values from two segments
-        #     z_t1_arr_expected = np.concatenate((
-        #         angles_values[closest_min_idx:],  # From laser_min to the end (3.14)
-        #         angles_values[:closest_max_idx]   # From the beginning (-3.14) to laser_max
-        #     ))
-    
-        # z_t1_arr_expected = 
-        # print(f"z_t1_arr is :{z_t1_arr_expected}")
-            
 
 
         scaling_coeff = 1.0
@@ -311,14 +261,9 @@ class SensorModel:
         prob_zt1 = 1.0
         
         ##### Vectorized Beam Model
+    
         # p_hit condition
         valid_hit_idxs = (z_t1_arr >= 0) & (z_t1_arr <= self._max_range) 
-        # print(z_t1_arr.shape)
-        # print(z_t1_arr_expected.shape)
-        # print(p_hit_beams.shape)
-        # print(valid_hit_idxs.shape)
-        
-        # # print(f"Valid hit_idxs :{valid_hit_idxs.shape}")
         p_hit_beams[valid_hit_idxs] = np.exp(-( np.square(z_t1_arr[valid_hit_idxs] -z_t1_arr_expected[valid_hit_idxs]) / (2*np.square(self._sigma_hit)) ))
         
         # p_short condition
@@ -329,18 +274,32 @@ class SensorModel:
         valid_rand_idxs = (z_t1_arr >= 0) & (z_t1_arr < self._max_range)
         p_rand_beams[valid_rand_idxs] = 1/self._max_range
 
-        # p_max condition (code fcks up w/tout tolerance)
-        valid_max_idxs = np.isclose(z_t1_arr, z_t1_arr_expected, rtol=1)
+        # p_max condition (float fcks up w/tout tolerance)
+        valid_max_idxs = np.isclose(z_t1_arr, z_t1_arr_expected, rtol=0.01)
         p_max_beams[valid_max_idxs] = 1
 
+        
         # Full-model probability 
         p_beams = self._z_hit*p_hit_beams + self._z_short*p_short_beams + self._z_rand*p_rand_beams + self._z_max*p_max_beams
         
         # Added for Numerical Stability
-        p_beams[p_beams < 1e-9] = 1e-9  
+        # p_beams[p_beams < 1e-9] = 1e-9  
 
-        prob_zt1 = np.prod(p_beams)
+        # prob_zt1 = np.sum(p_beams)/p_beams.shape
+        prob_zt1 = np.sum(p_beams)
+        # prob_zt1 = np.sum(np.log(p_beams))/p_beams.shape
+        # prob_zt1 = np.prod(p_beams)
+        
 
+        
+        # print(f"z_hit :{np.sum(self._z_hit*p_hit_beams)}")
+        # print(f"z_short :{np.sum(self._z_short*p_short_beams)}")
+        # print(f"z_rand :{np.sum(self._z_rand*p_rand_beams)}")
+        # print(f"z_max :{np.sum(self._z_max*p_max_beams)}")
+        # if(prob_zt1 > 0.0):
+        #     print(f"Laser probs are :{prob_zt1}")
+        # print("############################")
+        # # exit()
         # For testing-purposes
         # prob_zt1 = 1.0
         return prob_zt1
