@@ -262,28 +262,42 @@ if __name__ == '__main__':
 
         # Note: this formulation is intuitive but not vectorized; looping in python is SLOW.
         # Vectorized version will receive a bonus. i.e., the functions take all particles as the input and process them in a vector.
-        for m in range(0, num_particles):
-            """
-            MOTION MODEL
-            """
-            x_t0 = X_bar[m, 0:3]
-            x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+        """
+        VECTORIZED MOTION MODEL
+        """
+        X_bar_ne    w[:, 0:3] = motion_model.update_vectorized(u_t0, u_t1, X_bar[:, 0:3])
+        """
+        VECTORIZED SENSOR MODEL
+        """
+        if (meas_type == "L"):
+            z_t = ranges
+            X_bar_new[:, 3]  = sensor_model.beam_range_finder_model_vectorized(z_t, X_bar_new)
+        else:
+            X_bar_new[:, 3] = X_bar[:, 3]
+            
         
-            """
-            SENSOR MODEL
-            """
-            if (meas_type == "L"):
-                z_t = ranges
-                w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
-                X_bar_new[m, :] = np.hstack((x_t1, w_t))
-            else:
-                X_bar_new[m, :] = np.hstack((x_t1, X_bar[m, 3]))
+        # for m in range(0, num_particles):
+        #     """
+        #     MOTION MODEL
+        #     """
+        #     x_t0 = X_bar[m, 0:3]
+        #     x_t1 = motion_model.update(u_t0, u_t1, x_t0)    
+        
+        #     """
+        #     SENSOR MODEL
+        #     """
+        #     if (meas_type == "L"):
+        #         z_t = ranges
+        #         w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
+        #         X_bar_new[m, :] = np.hstack((x_t1, w_t))
+        #     else:
+        #         X_bar_new[m, :] = np.hstack((x_t1, X_bar[m, 3]))
 
-            if args.visualize_rays:
-                visualize_particle_rays(x_t1, z_t)
+        #     if args.visualize_rays:
+        #         visualize_particle_rays(x_t1, z_t)
                 # visualize_measurements(x_t1, z_t)
                 # visualize_expected_measurements(x_t1)
-            
+
         X_bar = X_bar_new
         u_t0 = u_t1
 
@@ -294,7 +308,4 @@ if __name__ == '__main__':
 
         if args.visualize:
             visualize_timestep(X_bar, time_idx, args.output)
-
-        
-        # exit()
         
