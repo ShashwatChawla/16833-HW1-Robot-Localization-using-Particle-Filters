@@ -10,7 +10,7 @@ import sys, os
 
 from map_reader import MapReader
 from motion_model import MotionModel
-from sensor_model import SensorModel
+from sensor_model import SensorModel    
 from resampling import Resampling
 
 from matplotlib import pyplot as plt
@@ -34,13 +34,53 @@ def visualize_timestep(X_bar, tstep, output_path):
     plt.pause(0.00001)
     scat.remove()
 
-def visualize_tracing():
-    x, y = (402, 484)
-    angle_values = sensor_model.ray_trace_measurements(x, y)
+# Function to visualize expected & rangefinder measurements for a single particle
+def visualize_particle_rays(x_t, z_t):    
+    x, y = x_t[0]/10, x_t[1]/10
+
+    laser_measurements_ = sensor_model.expected_ray_measurements(x_t)
+    angles = np.linspace(x_t[2] - np.pi/2, x_t[2] + np.pi/2, 180)
     
-    angles = np.radians(np.arange(-180, 180, 1))
-    ray_end_x = x + (angle_values*np.cos(angles)/10)
-    ray_end_y = y + (angle_values*np.sin(angles)/10)
+    ray_end_x = x + (laser_measurements_*np.cos(angles)/10)
+    ray_end_y = y + (laser_measurements_*np.sin(angles)/10)
+    
+    lines = []
+    for x_, y_ in zip(ray_end_x, ray_end_y):
+        line = plt.plot([x, x_], [y, y_], 'y-') 
+        lines.extend(line) 
+    
+    rangefinder_end_x = x + (z_t*np.cos(angles)/10)
+    rangefinder_end_y = y + (z_t*np.sin(angles)/10)
+    
+    rangefinder_lines = []
+    for x_, y_ in zip(rangefinder_end_x, rangefinder_end_y):
+        line_ = plt.plot([x, x_], [y, y_], 'g-') 
+        rangefinder_lines.extend(line_) 
+    
+    
+    
+    scat = plt.scatter(x, y, c='r', marker='o')
+
+    plt.pause(0.1)
+
+    for line in lines:
+        line.remove()
+    for line_ in rangefinder_lines:
+        line_.remove()
+    scat.remove()
+
+# Function to visualize expected-measurements for a single particle
+def visualize_expected_measurements(x_t):    
+    x, y = x_t[0]/10, x_t[1]/10
+
+    laser_measurements_ = sensor_model.expected_ray_measurements(x_t)
+    angles = np.linspace(x_t[2] - np.pi/2, x_t[2] + np.pi/2, 180)
+
+    # angles = np.radians(np.arange(x_t[2]-np.pi/2, x_t[2]+np.pi/2, np.pi/180))
+    
+    # print(f"laser_measurements:{len(laser_measurements_)} | angles_ = {angles}")
+    ray_end_x = x + (laser_measurements_*np.cos(angles)/10)
+    ray_end_y = y + (laser_measurements_*np.sin(angles)/10)
     
     lines = []
 
@@ -50,33 +90,34 @@ def visualize_tracing():
     
     scat = plt.scatter(x, y, c='r', marker='o')
 
-    plt.pause(0)
+    plt.pause(0.1)
 
     for line in lines:
         line.remove()
     scat.remove()
 
-    # exit()
+# Function to visualize rangefinder measurements for a single particle
+def visualize_measurements(x_t, z_t):
+    x, y = x_t[0]/10, x_t[1]/10
 
+    # laser_measurements_ = sensor_model.expected_ray_measurements(x_t)
+    angles = np.linspace(x_t[2] - np.pi/2, x_t[2] + np.pi/2, 180)
 
-# Function to visualize a single ray (TODO: For all the particles)
-def visualize_rays(x_t, z_t):
-    x_locs = x_t[0] / 10.0
-    y_locs = x_t[1] / 10.0
-    scat = plt.scatter(x_locs, y_locs, c='r', marker='o')
-    angles = np.radians(np.arange(-90, 90, 1))
-    ray_end_x = x_locs + (z_t*np.cos(x_t[2] + angles)/10)
-    ray_end_y = y_locs + (z_t*np.sin(x_t[2] + angles)/10)
+    rangefinder_end_x = x + (z_t*np.cos(angles)/10)
+    rangefinder_end_y = y + (z_t*np.sin(angles)/10)
     
-    lines = []
+    rangefinder_lines = []
+    for x_, y_ in zip(rangefinder_end_x, rangefinder_end_y):
+        line_ = plt.plot([x, x_], [y, y_], 'g-') 
+        rangefinder_lines.extend(line_) 
+        
+    
+    scat = plt.scatter(x, y, c='r', marker='o')
 
-    for x, y in zip(ray_end_x, ray_end_y):
-        line = plt.plot([x_locs, x], [y_locs, y], 'g-') 
-        lines.extend(line) 
-    plt.pause(1)
+    plt.pause(0.5)
 
-    for line in lines:
-        line.remove()
+    for line_ in rangefinder_lines:
+        line_.remove()
     scat.remove()
 
 
@@ -106,6 +147,11 @@ def init_particles_freespace(num_particles, occupancy_map):
     X_bar_init = np.zeros((num_particles, 4))
 
     freespace_rows, freespace_cols = np.where(occupancy_map == 0)
+
+    # Check-up for datalog-1
+    # freespace_cols = freespace_cols[freespace_cols < 450] 
+    # freespace_rows = freespace_rows[freespace_rows > 250] 
+    
     # Rows are y-axis
     valid_pts = list(zip(freespace_cols, freespace_rows))
     
@@ -176,7 +222,7 @@ if __name__ == '__main__':
     """
     if args.visualize:
         visualize_map(occupancy_map)
-
+    
     first_time_idx = True
     for time_idx, line in enumerate(logfile):
 
@@ -233,11 +279,11 @@ if __name__ == '__main__':
             else:
                 X_bar_new[m, :] = np.hstack((x_t1, X_bar[m, 3]))
 
-            # if args.visualize_rays:
-            #     z_t = sensor_model.ray_tracing(x_t1)
-            #     visualize_rays(x_t1, z_t)
-
-
+            if args.visualize_rays:
+                visualize_particle_rays(x_t1, z_t)
+                # visualize_measurements(x_t1, z_t)
+                # visualize_expected_measurements(x_t1)
+            
         X_bar = X_bar_new
         u_t0 = u_t1
 
