@@ -76,10 +76,20 @@ class SensorModel:
         # self._z_max = 0.1
         # self._z_rand = 100
 
-        self._z_hit = 10
-        self._z_short = 40
-        self._z_max = 20
-        self._z_rand = 50
+        self._z_hit = 1
+        self._z_short = 5
+        self._z_max = 0.1
+        self._z_rand = 1.5
+
+        # self._z_hit = 2
+        # self._z_short = 5
+        # self._z_max = 0.1
+        # self._z_rand = 1.5
+
+        # self._z_hit = 20
+        # self._z_short = 3
+        # self._z_max = 3
+        # self._z_rand = 50
         
         # self._z_hit = 0.05
         # self._z_short = 0.5 
@@ -87,10 +97,10 @@ class SensorModel:
         # self._z_rand = 0.01
 
         # Keeping it small by assuming its good lidar.
-        self._sigma_hit = 15.0
+        self._sigma_hit = 5.0
         # self._sigma_hit = 5.0
         # self._sigma_hit = 50
-        self._lambda_short = 0.01
+        self._lambda_short = 0.05
 
         # Used in p_max and p_rand, optionally in ray casting
         self._max_range = 1000
@@ -304,7 +314,7 @@ class SensorModel:
             particle_data.append((x_t1_transformed_particles[i], expected_ray_vals, ang_arr))
 
         
-        with mp.Pool(processes=13) as pool:
+        with mp.Pool(processes=15) as pool:
             z_t1_arr_expected_particles = pool.map(worker_function, particle_data)
 
         return np.array(z_t1_arr_expected_particles)
@@ -325,6 +335,8 @@ class SensorModel:
 
         # Expected Ray Measurements 
         z_t1_arr_expected_particles = self.vec_expected_ray_measurements(x_t1_transformed_particles)
+        z_t1_arr_expected_particles = np.divide(z_t1_arr_expected_particles, 10)
+        z_t1_arr = np.divide(z_t1_arr, 10) 
 
         ##### Vectorized Beam Model
         p_hit_beams = np.zeros((num_particles, z_t1_arr.shape[0]), dtype=np.float64)
@@ -353,7 +365,7 @@ class SensorModel:
         p_beams = self._z_hit * p_hit_beams + self._z_short * p_short_beams + self._z_rand * p_rand_beams + self._z_max * p_max_beams
 
         # Sum across beams for each particle
-        prob_zt1_arr = np.sum(p_beams, axis=1)
+        prob_zt1_arr = np.sum(p_beams, axis=1)/z_t1_arr.shape[0]
 
         return prob_zt1_arr
 
@@ -367,6 +379,7 @@ class SensorModel:
         TODO : Add your code here
         """
 
+        
         # Centre to Laser Transform
         x_t1_transformed = self.centre2laser_transform(x_t1, visualize=False)
 
@@ -400,7 +413,9 @@ class SensorModel:
         p_rand_beams[valid_rand_idxs] = 1/self._max_range
 
         # p_max condition (float fcks up w/tout tolerance)
-        valid_max_idxs = np.isclose(z_t1_arr, self._max_range, rtol=0.01)
+        # valid_max_idxs = np.isclose(z_t1_arr, self._max_range, rtol=0.01)
+        valid_max_idxs = (z_t1_arr == self._max_range)
+            
         p_max_beams[valid_max_idxs] = 1
 
         
@@ -408,11 +423,14 @@ class SensorModel:
         p_beams = self._z_hit*p_hit_beams + self._z_short*p_short_beams + self._z_rand*p_rand_beams + self._z_max*p_max_beams
         
         # Added for Numerical Stability
-        # p_beams[p_beams < 1e-9] = 1e-9  
+        p_beams[p_beams < 1e-9] = 1e-9  
 
         # prob_zt1 = np.sum(p_beams)/p_beams.shape
-        prob_zt1 = np.sum(p_beams)
+        prob_zt1 = np.sum(np.log(p_beams))
         
+
+        
+        # if np.sum(self._z_short*p_short_beams) > np.sum(self._z_rand*p_rand_beams):
 
         # print(f"z_hit :{np.sum(self._z_hit*p_hit_beams)}")
         # print(f"z_short :{np.sum(self._z_short*p_short_beams)}")
