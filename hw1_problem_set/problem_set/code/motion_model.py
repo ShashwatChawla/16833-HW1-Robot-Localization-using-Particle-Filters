@@ -66,16 +66,19 @@ class MotionModel:
         del_rot_1 = np.arctan2(del_y, del_x) - u_t0[2]
         del_trans = np.sqrt(np.square(del_x) + np.square(del_y))
         del_rot_2 = del_theta - del_rot_1
-            
+
+        # Std-dev for Gaussian-Noise 
         std_rot1  = np.sqrt(self._alpha1*np.square(del_rot_1) + self._alpha2*np.square(del_trans))
         std_trans = np.sqrt(self._alpha3*np.square(del_trans) + self._alpha4*np.square(del_rot_1) + self._alpha4*np.square(del_rot_2)) 
         std_rot2  = np.sqrt(self._alpha1*np.square(del_rot_2) + self._alpha2*np.square(del_trans))
-    
+
+        # Overall Movement
         del_rot_1_bar = del_rot_1 - np.random.normal(0.0, std_rot1 ,  X_t0.shape[0])
         del_trans_bar = del_trans - np.random.normal(0.0, std_trans,  X_t0.shape[0])
         del_rot_2_bar = del_rot_2 - np.random.normal(0.0, std_rot2 ,  X_t0.shape[0])        
 
         
+        # World-Frame Transformation
         X_t1 = np.array(X_t0) + np.array([
                                          del_trans_bar * np.cos(X_t0[:, 2] + del_rot_1_bar), 
                                          del_trans_bar * np.sin(X_t0[:, 2] + del_rot_1_bar),
