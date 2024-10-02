@@ -12,10 +12,12 @@ class Resampling:
     References: Thrun, Sebastian, Wolfram Burgard, and Dieter Fox. Probabilistic robotics. MIT press, 2005.
     [Chapter 4.3]
     """
-    def __init__(self):
+    def __init__(self, num_particles):
         """
         TODO : Initialize resampling process parameters here
         """
+        self.num_particles = num_particles
+        self.step = 1/self.num_particles
 
     def multinomial_sampler(self, X_bar):
         """
@@ -36,43 +38,33 @@ class Resampling:
         """
         TODO : Add your code here
         """
+        
         # New Array of resampled wts
         X_bar_resampled =  np.zeros_like(X_bar)
         
         # Varibles for sampler
-        num_samples = X_bar.shape[0]
-        step        = 1/num_samples
-        u_rand      = np.random.uniform(0, step)
-        
+        u_rand      = np.random.uniform(0, self.step)
+        idx = -1
+
         if np.sum(X_bar[:, 3]) == 0:
-            X_bar_resampled = X_bar
-            print(f"[WARN]Returning X_bar as it is")
-            return X_bar_resampled
-        # Normalized Wt. arr
-        normalized_wts = X_bar[:, 3]/np.sum(X_bar[:, 3])
-        
-        # Cumalitive Wt. arr 
-        cumulative_wts = np.cumsum(normalized_wts)
-        
-        i = 0
-        # Sample Particles
-        for j in range(0, num_samples):
-            resampling_wt = u_rand + j*step
-            for c_idx, c_wt in enumerate(cumulative_wts):
-                if resampling_wt <= c_wt:
-                    X_bar_resampled[i, :3] = X_bar[c_idx, :3]
-                    break
-                
-                elif resampling_wt > c_wt and resampling_wt < cumulative_wts[c_idx+1]:
-                    X_bar_resampled[i, :3] = X_bar[c_idx+1, :3]
-                    break
-            
-            # print(f"Particle '{i}' replaced with '{c_idx}'")
-            i += 1
+            print(f"[WARN]Returning X_bar | Sum is zero")
+            return X_bar
         
 
-        # For Testing Purposes
-        # X_bar_resampled =  np.zeros_like(X_bar)
-        # X_bar_resampled = X_bar 
+        # Normalised X_bar
+        X_bar[:, 3] = X_bar[:, 3]/np.sum(X_bar[:, 3])
         
+        # # Cumalitive Wt. arr 
+        # cumulative_wts = np.cumsum(normalized_wts)
+        
+        cum_wt = X_bar[0, 3]
+        for p_ in range(0, self.num_particles):
+            u_wt = u_rand + (p_)*self.step
+            while u_wt > cum_wt and idx+1 < self.num_particles: 
+                idx += 1
+                # Move to them cumalitive wt.
+                cum_wt += X_bar[idx, 3]
+            X_bar_resampled[p_, :] = X_bar[idx, :]
+            # Equal weight to all
+            X_bar_resampled[p_, 3] = 1/self.num_particles
         return X_bar_resampled
