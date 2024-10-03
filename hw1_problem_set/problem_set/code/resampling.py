@@ -6,16 +6,18 @@
 
 import numpy as np
 
-
 class Resampling:
     """
     References: Thrun, Sebastian, Wolfram Burgard, and Dieter Fox. Probabilistic robotics. MIT press, 2005.
     [Chapter 4.3]
     """
-    def __init__(self, num_particles, occupancy_map, kidnap_test=False):
+    def __init__(self, num_particles, occupancy_map, seed, kidnap_test=False,):
         """
         TODO : Initialize resampling process parameters here
-        """
+        """ 
+        # For Reproducability
+        np.random.seed(seed)
+    
         self.num_particles = num_particles
         self.step = 1/self.num_particles
         self.occupancy_map = occupancy_map

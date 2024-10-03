@@ -14,27 +14,16 @@ class MotionModel:
     References: Thrun, Sebastian, Wolfram Burgard, and Dieter Fox. Probabilistic robotics. MIT press, 2005.
     [Chapter 5]
     """
-    def __init__(self):
+    def __init__(self, seed):
         """
         TODO : Tune Motion Model parameters here
         The original numbers are for reference but HAVE TO be tuned.
         """
+        # For Reproducability
+        np.random.seed(seed)
+    
 
-        # With odometry skip
-        # self._alpha1 = 0.00005
-        # self._alpha2 = 0.00005
-        # self._alpha3 = 0.0005
-        # self._alpha4 = 0.0005   
-
-
-        # self._alpha1 = 0.00002
-        # self._alpha2 = 0.00002
-        # self._alpha3 = 0.00025
-        # self._alpha4 = 0.00025
-
-
-
-        # These work
+        # Keeping noise-low
         self._alpha1 = 0.00001
         self._alpha2 = 0.00001
         self._alpha3 = 0.0001

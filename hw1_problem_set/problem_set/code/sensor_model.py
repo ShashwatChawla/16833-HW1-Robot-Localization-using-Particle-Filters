@@ -17,50 +17,28 @@ from multiprocessing import Pool
 from functools import partial
 from tqdm import tqdm
 
+
 class SensorModel:
     """
     References: Thrun, Sebastian, Wolfram Burgard, and Dieter Fox. Probabilistic robotics. MIT press, 2005.
     [Chapter 6.3]
     """
-    def __init__(self, occupancy_map):
+    def __init__(self, occupancy_map, seed):
         """
         TODO : Tune Sensor Model parameters here
         The original numbers are for reference but HAVE TO be tuned.
         """
-    #### Reasonably good (for max_range:800 map::)
-        # self._z_hit = 80        
-        # self._z_short = 125
-        # self._z_max = 0.8
-        # self._z_rand =700
-    ###############
-        
-    #### New Beam Model Values 
-        # self._z_hit = 1.000       
-        # self._z_short = 0.00
-        # self._z_max = 0.01
-        # self._z_rand =10
-        # self._sigma_hit = 3.0   
-        # self._lambda_short = 1.0
-        # self._max_range = 200
-    ###############
-        self._z_hit = 1.0000       
-        self._z_short = 0.001
-        self._z_max = 0.01
-        self._z_rand =10
-        self._sigma_hit = 3.0   
-        self._lambda_short = 1.0
-        self._max_range = 200
-    
+        # For Reproducability
+        np.random.seed(seed)
 
-    #### P Values 
-        # self._z_hit = 1.5    
-        # self._z_short = 0.1
-        # self._z_max = 0.05
-        # self._z_rand =700
-        # self._sigma_hit = 300.0   
-        # self._lambda_short = 0.1
-        # self._max_range = 8000
-    ###############
+
+        self._z_hit = 11
+        self._z_short = 0
+        self._z_max = 1
+        self._z_rand =800
+        self._sigma_hit = 3
+        self._lambda_short = 0.01
+        self._max_range = 800
         
     
         # Used for thresholding obstacles of the occupancy map
@@ -165,9 +143,37 @@ class SensorModel:
     
 # Get expected measurements for a particle (all-angles; used for visualization)
     def zt_k_star_particle(self, x_t1):
+        # Compute the new x and y positions using vectorized operations
+        x_t1_off_x = x_t1[0] + self._laser_offset * np.cos(x_t1[2])
+        x_t1_off_y = x_t1[1] + self._laser_offset * np.sin(x_t1[2])
+
+        # Combine the new positions with the original orientations (theta)
+        x_t1_off = np.array([x_t1_off_x, x_t1_off_y, x_t1[2]])
+        
         # Tranform into map-frame & search the array
-        map_x, map_y = np.floor_divide([x_t1[0], x_t1[1]], self.map_resolution).astype(int)
-        return self.sensor_map[map_x,map_y,:]
+        map_x, map_y = np.floor_divide([x_t1_off[0], x_t1_off[1]], self.map_resolution).astype(int)
+        
+        angles_ = np.rad2deg(x_t1_off[2])
+        laser_min, laser_max = angles_ - 90, angles_ + 90
+        
+        laser_min = np.mod(laser_min + 360, 360).astype(int)
+        laser_max = np.mod(laser_max + 360, 360).astype(int)
+
+        z_tk_star = np.zeros((1, 180), dtype=np.float64)
+
+        if laser_min < laser_max:
+                z_tk_star = self.sensor_map[map_x, map_y, laser_min:laser_max]
+
+        else:
+            # Slice in parts
+            z_tk_star = np.concatenate((
+                                                self.sensor_map[map_x, map_y, laser_min:],  
+                                                self.sensor_map[map_x, map_y, :laser_max]   
+                                        ))
+        
+        return z_tk_star
+    
+
 
 
 # Get expected measurements for particles
@@ -195,77 +201,6 @@ class SensorModel:
                                                 ))
         return z_tk_star
 
-  
-# Beam Range Finder Model
-    def beam_range_finder_model_vectorized_new(self, z_t1_k, x_t1_particles):
-        """
-        param[in] z_t1_k : laser range readings [array of 180 values] at time t
-        param[in] x_t1_particles : array of particle states, shape [num_particles, 3] where each row is [x, y, theta] at time t [world_frame]
-        param[out] prob_zt1_arr : array of likelihoods for each particle, shape [num_particles]
-        """
-        num_particles = x_t1_particles.shape[0]
-        
-        # Centre to Laser Transform 
-        x_t1_off = self.centre2laser_transform_vec(x_t1_particles)
-        # Get Expected Laser Measurements
-        z_t1_k_star = self.zt_k_star_vec(x_t1_off)
-        
-        # Clip & Tranform in map-frame 
-        z_t1_k = np.divide(z_t1_k, self.map_resolution) 
-        z_t1_k = np.clip(z_t1_k, 0, self._max_range)
-        z_t1_k_star = np.clip(z_t1_k_star, 0, self._max_range)
-        
-        # Sub-sample
-        # z_t1_k = z_t1_k[::self._subsampling]
-        # z_t1_k_star = z_t1_k_star[::self._subsampling] 
-        
-
-        ##### Beam Range Finder Model
-        p_hit_   = np.zeros((num_particles, z_t1_k.shape[0]), dtype=np.float64)
-        p_max_   = np.zeros((num_particles, z_t1_k.shape[0]), dtype=np.float64)
-        p_short_ = np.zeros((num_particles, z_t1_k.shape[0]), dtype=np.float64)
-        p_rand_  = np.zeros((num_particles, z_t1_k.shape[0]), dtype=np.float64)
-        
-        # p_hit condition
-        hit_idxs = (z_t1_k >= 0) & (z_t1_k <= self._max_range)
-        p_hit_[:, hit_idxs] = np.exp( -0.5 *(z_t1_k[hit_idxs] - z_t1_k_star[:, hit_idxs]) **2 / self._sigma_hit **2 )
-        p_hit_[:, hit_idxs] /= self._sigma_hit * np.sqrt(2*np.pi)  
-        # Scale and Clip if still not powerful 
-        p_hit_ *= 10000
-        p_hit_[p_hit_ < 1e-1] = 1e-1
-        
-        # p_max condition
-        p_max_[:, (z_t1_k >= self._max_range)] = 1
-        
-        # p_short condition
-        p_short_ = self._lambda_short * np.exp(-self._lambda_short * z_t1_k)
-        p_short_ = np.where(z_t1_k > z_t1_k_star, 0, p_short_)
-
-        # p_rand condition
-        p_rand_[:, (z_t1_k < self._max_range)] = 1 / self._max_range 
-        
-        
-        # hit_ = self._z_hit * np.sum(np.log(p_hit_), axis=1)
-        # max_ = self._z_max * np.sum(p_max_, axis=1)
-        # short_ = self._z_short * np.sum(p_short_, axis=1)
-        # rand_ = self._z_rand * np.sum(p_rand_, axis=1)
-
-        # prob_particles = hit_ + max_ + short_ + rand_
-        # print("p_hit :", np.max(hit_))
-        # print("p_max :", np.max(max_))
-        # print("p_short: ", np.max(short_))
-        # print("p_rand :", np.max(rand_))
-        
-        
-        
-        # Total Probability
-        prob_particles = self._z_hit * np.sum(np.log(p_hit_), axis=1) \
-                       + self._z_max * np.sum(p_max_, axis=1)         \
-                       + self._z_short * np.sum(p_short_, axis=1)     \
-                       + self._z_rand * np.sum(p_rand_, axis=1)       \
-        
-        return prob_particles
-
 
 # Beam Range Finder Model
     def beam_range_finder_model_vectorized(self, z_t1_k, x_t1_particles):
@@ -280,16 +215,15 @@ class SensorModel:
         x_t1_off = self.centre2laser_transform_vec(x_t1_particles)
         # Get Expected Laser Measurements
         z_t1_k_star = self.zt_k_star_vec(x_t1_off)
+        # z_t1_k_star = np.clip(z_t1_k_star, 0, self._max_range)
         
         # Clip & Tranform in map-frame 
         z_t1_k = np.divide(z_t1_k, self.map_resolution) 
         z_t1_k = np.clip(z_t1_k, 0, self._max_range)
-        z_t1_k_star = np.clip(z_t1_k_star, 0, self._max_range)
 
         # Sub-sample
         z_t1_k = z_t1_k[::self._subsampling]
         z_t1_k_star = z_t1_k_star[::self._subsampling] 
-
 
 
         ##### Beam Range Finder Model
@@ -304,24 +238,35 @@ class SensorModel:
         p_hit_[:, hit_idxs] /= self._sigma_hit * np.sqrt(2*np.pi)  
         
         # p_rand condition
-        p_rand_[:, (z_t1_k < self._max_range)] = 1 / self._max_range 
+        p_rand_[:, hit_idxs] = 1 / self._max_range 
         
         # p_max condition
-        p_max_[:, (z_t1_k >= self._max_range)] = 1
+        hit_idxs = (z_t1_k >= self._max_range)
+        p_max_[:, hit_idxs] = 1
 
         # p_short condition
         p_short_ = self._lambda_short * np.exp(-self._lambda_short * z_t1_k)
         p_short_ = np.where(z_t1_k > z_t1_k_star, 0, p_short_)
 
         # Full-model probability 
-        p_beams = self._z_hit * p_hit_ + self._z_short * p_short_ + self._z_rand * p_rand_ + self._z_max * p_max_
+        p_hit = self._z_hit * p_hit_
+        p_short = self._z_short * p_short_
+        p_rand = self._z_rand * p_rand_
+        p_max = self._z_max * p_max_
         
-        # For Numerical Stability
-        p_beams[p_beams < 1e-0] = 1e-0
-
-        # Log-sum & Exp
-        prob_particles = np.sum(np.log(p_beams), axis=1)
-        prob_particles = np.exp(prob_particles)
+        p = p_hit + p_short + p_rand + p_max
+        q = np.sum(np.log(p), axis=1)
+        # q = np.exp(q)
         
-        return prob_particles
+        # plt.figure(2)
+        # plt.cla()
+        # plt.plot(np.sum(p_hit, axis=1), label="p_hit")
+        # plt.plot(np.sum(p_short, axis=1), label="p_short")
+        # plt.plot(np.sum(p_rand, axis=1), label="p_rand")
+        # plt.plot(np.sum(p_max, axis=1), label="p_max")
+        # plt.plot(np.sum(p, axis=1), label="p")
+        # plt.legend()
+        
+        
+        return q
 
