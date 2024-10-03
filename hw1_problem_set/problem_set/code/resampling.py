@@ -20,6 +20,7 @@ class Resampling:
         self.step = 1/self.num_particles
         self.occupancy_map = occupancy_map
         self._robot_kidnap = kidnap_test
+
         if self._robot_kidnap:
             # Detect kidnap if Mean/Max wt ratio below this threshold 
             self._kidnap_threshold = 0.2    
@@ -27,8 +28,17 @@ class Resampling:
             print("[INFO] Kidnap Detection Enabled")
         else:
             print("[INFO] Kidnap Detection Disabled")
-        
 
+        # Params for Adaptive Low-Variance Sampling
+        self.low_variance_threshold = 1.1e-9
+        self.max_particles = num_particles
+        self.min_particles = num_particles/10
+        # Reduce by 5%
+        self._reduction_factor = 0.95  
+        # Increase by 20% 
+        self._increase_factor = 1.2
+        
+# Same as in main.py
     def init_particles_freespace(self, num_particles, occupancy_map):
 
         # initialize [x, y, theta] positions in world_frame for all particles
@@ -125,4 +135,78 @@ class Resampling:
         X_bar_resampled[:, -1] = X_bar[:, -1]
 
         return X_bar_resampled
+
+
+
+    def adaptive_low_variance_sampler(self, X_bar):
+        """
+        param[in] X_bar : [num_particles x 4] sized array containing [x, y, theta, wt] values for all particles
+        param[out] X_bar_resampled : [num_particles x 4] sized array containing [x, y, theta, wt] values for resampled set of particles
+        """
+        
+        """
+        Derivate of:
+            UC Berkley https://homes.cs.washington.edu/~todorov/courses/cseP590/16_ParticleFilter.pdf
+        Approach: Effective Sample Size (ESS) 
+        """
+        X_bar_resampled = np.zeros_like(X_bar)
+        num_particles = X_bar.shape[0]  # Number of particles (rows in X)
+    
+        wt = X_bar[:, -1]
+
+        # If kidnap detection is enabled
+        if self._robot_kidnap:
+            # Average over all particles:
+            max_wt = np.max(wt)
+            mean_wt = np.average(wt)
+            mean_max_r = mean_wt/max_wt
+
+            if mean_max_r < self._kidnap_threshold:
+                print("[WARN] Robot Kidnap Detected !!!!!!!!!!!!!!!!!")
+                print("[INF0] Resampling Particles in Free-Space")
+                # Initialise Particles in free-space
+                self.init_particles_freespace(self.num_particles, self.occupancy_map)
+
+
+        wt = wt / np.sum(wt)
+        wt_var = np.var(wt)
+        # print(f"!!!!!!!!!!!!!!!!!!!!!!!!   Wt variance :{wt_var}")
+        # Adaptive Sampling
+        if wt_var < self.low_variance_threshold:
+            # Reduce particles if the filter has converged (low variance)
+            num_particles = max(self.min_particles, int(num_particles * self._reduction_factor))
+            print(f"Low variance. Sampled particles :{num_particles}")        
+        else:
+            # Increase particles if high uncertainty (high variance)
+            num_particles = min(self.max_particles, int(num_particles * self._increase_factor))
+            print(f"High variance. Sampled particles :{num_particles}")        
+        
+         
+        X_bar_resampled = np.zeros((num_particles, X_bar.shape[1]))
+
+
+        r = np.random.uniform(0, 1/num_particles)
+    
+        c = wt[0]
+        i = 0
+
+        # Loop over all particles
+        for m in range(num_particles):
+            u = r + (m / num_particles)  # Resampling threshold
+
+            # Move through the particles until we find the one corresponding to u
+            while u > c:
+                i += 1
+                c += wt[i]
+
+            # Add the selected particle (excluding the weight) to the resampled set
+            X_bar_resampled[m] = X_bar[i]
+        
+        # Reset weights
+        X_bar_resampled[:, -1] = 1.0 / num_particles
+
+        # X_bar_resampled[:, -1] = X_bar[:, -1]
+
+        return X_bar_resampled
+
 
