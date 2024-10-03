@@ -74,6 +74,9 @@ def visualize_timestep(X_bar, tstep, output_path, ranges):
     robot_text = f"Robot Position: ({x_robot[0]:.2f}, {x_robot[1]:.2f}, {x_robot[2]:.2f})"
     text = plt.text(5, 770, robot_text, fontsize=7, color='g')
     # robot_kidnap = plt.text(5, 735, "Kidnap Detection Enabled", fontsize=8, color='r')
+    samples_ = f"Samples: {X_bar.shape[0]}"
+    samples_ = plt.text(5, 735, samples_, fontsize=8, color='r')
+    
     plt.savefig('{}/{:04d}.png'.format(output_path, tstep))
     plt.pause(0.00001)
 
@@ -89,6 +92,7 @@ def visualize_timestep(X_bar, tstep, output_path, ranges):
     # scat.remove()
     scat2.remove()  
     text.remove()  
+    samples_.remove()
     # scat3.remove()
     arrows.remove()
 
