@@ -64,6 +64,7 @@ class SensorModel:
         else:
             print("[WARN] Couldn't find sensor map. Trying to generate")
             self.create_sensor_map()
+            self.sensor_map = np.load(self._path_sensor_map)
         print("[INFO] Sensor map loaded successfully")
 
 # Function to trace rays and create hash-map
