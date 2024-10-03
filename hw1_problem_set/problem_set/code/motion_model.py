@@ -19,10 +19,20 @@ class MotionModel:
         TODO : Tune Motion Model parameters here
         The original numbers are for reference but HAVE TO be tuned.
         """
-        # self._alpha1 = 0.00001
-        # self._alpha2 = 0.00001
+
+        # With odometry skip
+        # self._alpha1 = 0.00005
+        # self._alpha2 = 0.00005
         # self._alpha3 = 0.0005
-        # self._alpha4 = 0.0005
+        # self._alpha4 = 0.0005   
+
+
+        # self._alpha1 = 0.00002
+        # self._alpha2 = 0.00002
+        # self._alpha3 = 0.00025
+        # self._alpha4 = 0.00025
+
+
 
         # These work
         self._alpha1 = 0.00001
@@ -31,15 +41,6 @@ class MotionModel:
         self._alpha4 = 0.0001
 
 
-        # self._alpha1 = 0.000005
-        # self._alpha2 = 0.000005
-        # self._alpha3 = 0.00005
-        # self._alpha4 = 0.00005
-
-        # self._alpha1 = 0.5
-        # self._alpha2 = 0.5
-        # self._alpha3 = 0.25
-        # self._alpha4 = 0.25
 
     # Keep angle b/w [-pi pi]
     def angle_wrap(self, theta):
@@ -56,7 +57,7 @@ class MotionModel:
         ###################################################
         #  Odom Motion Model-Probalistic Robotics(Ch5)  #  
         ###################################################
-
+        # return X_t0
         if np.all(u_t0 == u_t1):
             return X_t0
 
@@ -82,8 +83,11 @@ class MotionModel:
         X_t1 = np.array(X_t0) + np.array([
                                          del_trans_bar * np.cos(X_t0[:, 2] + del_rot_1_bar), 
                                          del_trans_bar * np.sin(X_t0[:, 2] + del_rot_1_bar),
-                                         self.angle_wrap(del_rot_1_bar + del_rot_2_bar)
+                                         del_rot_1_bar + del_rot_2_bar
                                          ]).T
+        
+        X_t1[:, 2] = self.angle_wrap(X_t1[:, 2])
+        
         return X_t1 
 
 
