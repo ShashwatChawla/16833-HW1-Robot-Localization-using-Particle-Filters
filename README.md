@@ -53,6 +53,10 @@ Particles for the next time step are sampled based on their weights from the cur
 
 Navigate to the code directory and execute the following command:
 
+# Disclaimer
+
+This repository contains my solutions to university assignments. It is shared for educational purposes and should not be used for plagiarism or violating academic integrity policies. Please adhere to your institution's honor code.
+
 ```bash
 cd code/
 python3 main.py --visualize
@@ -66,6 +70,9 @@ python3 main.py --visualize
 * **Enable Adaptive Sampling** : `--adaptive`
 * **Enable Robot Kidnap Detection** : `--detect_kidnap`
 
-
-
 [1]: Probabilistic Robotics, by Sebastian Thrun, Wolfram Burgard, and Dieter Fox.
+
+
+# Disclaimer
+
+This repository contains my solution to 16833-Localization and Mapping Homework1. It is shared for educational purposes and should not be used for plagiarism or violating academic integrity policies. Please adhere to your institution's honor code.
