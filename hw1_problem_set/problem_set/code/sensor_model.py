@@ -5,10 +5,13 @@
 '''
 
 import numpy as np
+import cupy as cp
 import math
 import time
 from matplotlib import pyplot as plt
 from scipy.stats import norm
+
+
 import os
 
 from map_reader import MapReader
@@ -63,9 +66,75 @@ class SensorModel:
             self.sensor_map = np.load(self._path_sensor_map)
         else:
             print("[WARN] Couldn't find sensor map. Trying to generate")
-            self.create_sensor_map()
+            # Use _cpu() when GPU unavailable
+            self.create_sensor_map_gpu()
+            # self.create_sensor_map()
             self.sensor_map = np.load(self._path_sensor_map)
         print("[INFO] Sensor map loaded successfully")
+
+# Function to trace rays and create hash-map using GPU
+    def create_sensor_map_gpu(self):
+        # Transfer occupancy map to GPU
+        occupancy_map_gpu = cp.asarray(self.occupancy_map)
+
+        # Collect free space indices
+        freespace_rows, freespace_cols = cp.where(occupancy_map_gpu == 0.0)
+        num_pts_ = freespace_cols.shape[0]
+
+        # Store angle arrays on GPU
+        angles_ = cp.linspace(0, 360, 360, endpoint=False)
+        cos_angles_ = cp.cos(cp.deg2rad(angles_)).reshape(-1, 1)
+        sin_angles_ = cp.sin(cp.deg2rad(angles_)).reshape(-1, 1)
+
+        # Store ray length array on GPU
+        ray_len_ = cp.linspace(0, self._max_range, int(self._max_range + 1), endpoint=True).reshape(-1, 1)
+
+        # Initialize particle rays array on GPU
+        particle_rays_arr_ = cp.full((self.map_width, self.map_height, angles_.shape[0]), 0, dtype=cp.float64)
+
+        # Occupancy map mask: 0 for free space, 1 for obstacles, -1 for out of bounds
+        map_mask_ = (occupancy_map_gpu >= self._min_probability).astype(cp.int32)
+        map_mask_[occupancy_map_gpu == -1] = 1
+
+        # Iterate for each particle
+        for idx in tqdm(range(0, num_pts_)):
+            # x is col, y is row
+            free_x = freespace_cols[idx]
+            free_y = freespace_rows[idx]
+
+            # Compute ray endpoints
+            map_x_idxs_ = (free_x + ray_len_ * cos_angles_.T).astype(cp.int32)
+            map_y_idxs_ = (free_y + ray_len_ * sin_angles_.T).astype(cp.int32)
+
+            # Mask for valid indices (within bounds)
+            valid_mask = (
+                (map_x_idxs_ >= 0) & (map_x_idxs_ < self.map_width) &
+                (map_y_idxs_ >= 0) & (map_y_idxs_ < self.map_height)
+            )
+
+            # Clip indices to prevent out-of-bounds
+            map_x_idxs_clipped = cp.clip(map_x_idxs_, 0, self.map_width - 1)
+            map_y_idxs_clipped = cp.clip(map_y_idxs_, 0, self.map_height - 1)
+
+            # Determine occupancy masked array
+            occupancy_masked = cp.where(valid_mask, map_mask_[map_y_idxs_clipped, map_x_idxs_clipped], 1)
+
+            # Initialize ray lengths
+            rays_ = cp.full(angles_.shape[0], self._max_range, dtype=cp.float64)
+
+            # Find the first hit index for each angle
+            hit_indices = cp.argmax(occupancy_masked, axis=0)
+
+            # Assign ray lengths for hits
+            rays_ = cp.where(occupancy_masked[hit_indices, cp.arange(angles_.shape[0])], hit_indices, rays_)
+
+            # Store in the particle rays array
+            particle_rays_arr_[free_x, free_y, :] = rays_
+
+        # Transfer the result back to the CPU and save
+        particle_rays_arr_cpu = cp.asnumpy(particle_rays_arr_)
+        np.save(self._path_sensor_map, particle_rays_arr_cpu)
+        print(f"Sensor map saved in file: {self._path_sensor_map}")
 
 # Function to trace rays and create hash-map
     def create_sensor_map(self):
@@ -103,8 +172,7 @@ class SensorModel:
             valid_mask = (
                             (map_x_idxs_ >= 0) & (map_x_idxs_ < self.map_width ) &
                             (map_y_idxs_ >= 0) & (map_y_idxs_ < self.map_height)
-                         )
-
+                         )     
              # Clip to prevent out-of-bounds 
             map_x_idxs_clipped = np.clip(map_x_idxs_, 0, self.map_width  - 1)
             map_y_idxs_clipped = np.clip(map_y_idxs_, 0, self.map_height - 1)
@@ -181,7 +249,8 @@ class SensorModel:
     def zt_k_star_vec(self, x_t1_off):        
 
         # Convert to map idxs
-        map_x, map_y = np.floor_divide([x_t1_off[:, 0], x_t1_off[:, 1]], self.map_resolution).astype(int)
+        coords = np.stack([x_t1_off[:, 0], x_t1_off[:, 1]])
+        map_x, map_y = np.floor_divide(coords, self.map_resolution).astype(int)
 
         angles_ = np.rad2deg(x_t1_off[:, 2])
         laser_min, laser_max = angles_ - 90, angles_ + 90
