@@ -36,7 +36,7 @@ Particles for the next time step are sampled based on their weights from the cur
 
 ## Features
 
-- **()Preprocessed Ray Map**: GPU-accelerated ray-casting on the unoccupied map space, performed once during initialization for efficiency.
+- **(GPU)Preprocessed Ray Map**: GPU-accelerated ray-casting on the unoccupied map space, performed once during initialization for efficiency.
   Remark: It takes less than 30sec to generate the map (80x80m^2)
 
   ![img](submission/ray_map.gif)
@@ -53,10 +53,6 @@ Particles for the next time step are sampled based on their weights from the cur
 
 Navigate to the code directory and execute the following command:
 
-# Disclaimer
-
-This repository contains my solutions to university assignments. It is shared for educational purposes and should not be used for plagiarism or violating academic integrity policies. Please adhere to your institution's honor code.
-
 ```bash
 cd code/
 python3 main.py --visualize
@@ -71,7 +67,6 @@ python3 main.py --visualize
 * **Enable Robot Kidnap Detection** : `--detect_kidnap`
 
 [1]: Probabilistic Robotics, by Sebastian Thrun, Wolfram Burgard, and Dieter Fox.
-
 
 # Disclaimer
 
